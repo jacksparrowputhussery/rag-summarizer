@@ -1,0 +1,31 @@
+# Core
+numpy>=1.24
+scipy>=1.10
+pyyaml>=6.0
+tqdm>=4.66
+scikit-learn>=1.3
+
+# Retrieval
+rank-bm25>=0.2.2
+
+# Optional dense retrieval / classifier stack (used when run.debug=false and
+# internet access to model hubs is available). The pipeline degrades
+# gracefully to TF-IDF based stand-ins if these are missing.
+sentence-transformers>=2.5
+faiss-cpu>=1.7.4
+torch>=2.1
+transformers>=4.38
+protobuf<=3.20.3
+sentencepiece>=0.2.0
+tiktoken>=0.7.0
+
+# Datasets
+datasets>=2.18
+
+# Text utils
+unidecode>=1.3
+nltk>=3.8
+
+# Plotting
+matplotlib>=3.7
+pandas>=2.0

@@ -1,0 +1,130 @@
+# =============================================================================
+# Modified Adaptive-RAG — Retrieval-Only Configuration
+# =============================================================================
+
+run:
+  seed: 42
+  debug: false                 # DEBUG=true -> tiny data, fast models, sanity checks
+  device: "auto"               # auto | cpu | cuda
+
+debug:
+  questions_per_dataset: 100
+  corpus_docs_per_dataset: 150
+  top_k: 5
+  semantic_model: "tfidf"      # cheap stand-in embedding used only in debug mode
+
+datasets:
+  use:
+    - squad
+    - natural_questions
+    - triviaqa
+    - musique
+    - hotpotqa
+    - 2wikimultihopqa
+  # If a dataset is not reachable (no internet / no local file), the loader
+  # falls back to a small synthetic sample so the pipeline still runs.
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  corpus_dir: "data/corpus"
+  # Per-dataset example counts (train+val+test combined; split ~70/15/15
+  # downstream). Only used when run.debug=false. Omit a dataset here to fall
+  # back to `full_run.default_questions_per_dataset`. Ignored entirely in
+  # DEBUG mode, which instead uses `debug.questions_per_dataset` for every
+  # dataset uniformly (kept small and equal on purpose, for fast smoke tests).
+  per_dataset_n:
+    squad: 3000
+    natural_questions: 3000
+    triviaqa: 3000
+    hotpotqa: 3000
+    2wikimultihopqa: 3000
+    musique: 2000
+
+full_run:
+  # Fallback count for any dataset listed in `datasets.use` but not given an
+  # explicit entry in `datasets.per_dataset_n` above.
+  default_questions_per_dataset: 3000
+
+chunking:
+  chunk_size: 128       # in words (tokens if a tokenizer is configured)
+  chunk_overlap: 20
+  unit: "words"          # words | tokens
+
+bm25:
+  top_k: 10
+  k1: 1.5
+  b: 0.75
+  cache_dir: "cache/bm25"
+
+semantic:
+  model_name: "BAAI/bge-base-en-v1.5"   # used when run.debug=false and network access exists
+  debug_model_name: "tfidf"              # offline stand-in used when run.debug=true
+  top_k: 10
+  batch_size: 256
+  cache_dir: "cache/embeddings"
+  faiss_cache_dir: "cache/faiss"
+
+hybrid:
+  candidate_k: 20
+  top_k: 10
+  alpha: 0.5             # weight on normalized BM25 score
+
+multihop:
+  max_hops: 3
+  top_k_per_hop: 5
+  top_k: 10
+
+evaluation:
+  primary_metric: "recall@5"
+  ks: [1, 5, 10]
+  semantic_match_threshold: 0.75
+  matching_priority: ["id", "exact_text", "token_overlap", "semantic"]
+  token_f1_match_threshold: 0.5
+
+labeling:
+  method: "lexicographic"       # lexicographic | utility
+  alpha_recall: 0.50
+  beta_f1: 0.25
+  gamma_mrr: 0.25
+  lambda_latency: 0.05
+  label_names: ["bm25", "semantic", "hybrid", "multihop"]
+  # Retrieval depth used ONLY while generating strategy labels (i.e. running
+  # all 4 retrievers to see which finds the gold evidence). Intentionally
+  # decoupled from semantic.top_k / bm25.top_k, which control retrieval
+  # depth at actual inference/evaluation time.
+  top_k: 10
+
+classifier:
+  backend: "transformer"        # tfidf_logreg (offline-safe default) | transformer
+  model_name: "microsoft/deberta-v3-base"   # used only when backend=transformer
+  num_classes: 4
+  learning_rate: 2.0e-5
+  batch_size: 32
+  epochs: 5
+  max_length: 64
+  early_stopping_patience: 2
+  class_weighting: true
+
+splits:
+  train: 0.7
+  val: 0.15
+  test: 0.15
+
+ablations:
+  chunk_sizes: [64, 128, 256]
+  top_ks: [1, 5, 10, 20]
+  hybrid_alphas: [0.25, 0.50, 0.75]
+  # In FULL mode (run.debug=false), ablations that re-retrieve per-question
+  # (chunk size / top-K / hybrid alpha sweeps) run on a capped sample of the
+  # test split rather than the whole thing, since each sweep point rebuilds
+  # an index and re-runs retrieval end-to-end. Ignored in DEBUG mode, which
+  # always uses the full (already tiny) test split.
+  sample_size: 300
+
+performance:
+  # Number of questions processed per batched retrieval call during label
+  # generation / baseline evaluation / adaptive inference. Only matters for
+  # retrievers with a batched implementation (semantic, hybrid, multihop) --
+  # this is what actually keeps a GPU busy instead of doing one encoder
+  # forward-pass per question. BM25-only retrieval doesn't benefit from this
+  # (CPU-bound, no encoder), so it's a no-op cost either way.
+  retrieval_batch_size: 128

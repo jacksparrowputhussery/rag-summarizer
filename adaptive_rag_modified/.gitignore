@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+venv/
+
+# Cache / generated artifacts
+cache/
+
+# Datasets
+data/
+
+# Model checkpoints / weights
+checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.safetensors
+
+# Generated experiments/results
+experiments/
+results/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
